@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Memorize the Path - Transport Vocabulary
+    </title>
+
+    <!-- Tailwind -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: radial-gradient(circle at center, #34495e 0%, #1b2a3a 45%, #0b1520 100%);
+            min-height: 100vh;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow-x: hidden;
+        }
+
+        /* =====================================================
+           TITLE
+        ===================================================== */
+        .game-title {
+            font-family: 'Fredoka', cursive;
+            letter-spacing: 0.06em;
+        }
+
+        /* =====================================================
+           GLASS PANEL
+        ===================================================== */
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.75);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 20px 45px rgba(0,0,0,0.25), inset 0 1px rgba(255,255,255,0.05);
+        }
+
+        /* =====================================================
+           SVG SECTORS
+        ===================================================== */
+        .sector {
+            cursor: pointer;
+            transform-origin: 200px 200px;
+            transition: transform 0.2s ease, filter 0.2s ease;
+            will-change: transform, filter; /* OPTIMIZATION: Hardware acceleration for old Chromebooks */
+            filter: drop-shadow(0 5px 7px rgba(0,0,0,0.32));
+        }
+
+        .sector:hover {
+            filter: brightness(1.15) drop-shadow(0 0 16px rgba(255,255,255,0.5));
+            transform: scale(1.018);
+        }
+
+        .sector.active {
+            filter: brightness(1.65) saturate(1.15) drop-shadow(0 0 28px var(--glow-color));
+            transform: scale(1.04);
+        }
+
+        /* New Transportation Colors */
+        .sector-bus { --glow-color: #f5c928; }        /* Yellow */
+        .sector-helicopter { --glow-color: #2dd4bf; } /* Teal */
+        .sector-train { --glow-color: #a855f7; }      /* Purple */
+        .sector-car { --glow-color: #ef4444; }        /* Red */
+        .sector-airplane { --glow-color: #3b82f6; }   /* Blue */
+        .sector-motorcycle { --glow-color: #22c55e; } /* Green */
+
+        .board-locked {
+            pointer-events: none;
+        }
+
+        /* =====================================================
+           CENTER
+        ===================================================== */
+        .center-ring {
+            transform-origin: 200px 200px;
+            transition: transform 0.25s ease;
+        }
+
+        .center-ring.pulse {
+            animation: centerPulse 0.55s ease;
+        }
+
+        @keyframes centerPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+
+        /* =====================================================
+           START BUTTON
+        ===================================================== */
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 15px rgba(99,185,221,0.35); }
+            50% { box-shadow: 0 0 32px rgba(99,185,221,0.85); }
+        }
+
+        .pulse-btn {
+            animation: pulse-glow 2s infinite;
+        }
+
+        /* =====================================================
+           ERROR & SUCCESS ANIMATIONS
+        ===================================================== */
+        .error-shake { animation: shake 0.45s ease; }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-9px); }
+            40% { transform: translateX(9px); }
+            60% { transform: translateX(-7px); }
+            80% { transform: translateX(7px); }
+        }
+
+        .success-pulse { animation: successPulse 0.65s ease; }
+
+        @keyframes successPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.035); }
+            100% { transform: scale(1); }
+        }
+
+        /* =====================================================
+           MODAL & EMOJIS
+        ===================================================== */
+        .modal-fade { transition: opacity 0.3s ease; }
+        .modal-box { transition: transform 0.3s ease; }
+
+        .emoji-icon {
+            font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+            pointer-events: none;
+        }
+
+        /* =====================================================
+           MOBILE
+        ===================================================== */
+        @media (max-width: 500px) {
+            .game-title { font-size: 2rem; }
+            .wheel-wrapper { max-width: 360px; }
+            .stat-number { font-size: 1.45rem; }
+        }
+    </style>
+
+</head>
+
+<body class="min-h-screen text-slate-100 flex flex-col items-center p-4 sm:p-6">
+
+<!-- =========================================================
+     HEADER
+========================================================= -->
+<header class="w-full max-w-2xl flex flex-col items-center gap-4 mt-2">
+
+    <h1 class="game-title text-3xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-400 via-amber-300 to-emerald-400 tracking-wider text-center drop-shadow-md">
+        MEMORIZE THE PATH
+    </h1>
+
+    <p class="text-slate-400 text-xs sm:text-sm font-medium text-center -mt-2">
+        Listen, memorize the sequence, and learn Transport vocabulary!
+    </p>
+
+    <!-- SCORE PANEL -->
+    <div class="glass-panel w-full rounded-2xl p-3 sm:p-4 flex justify-around items-center shadow-2xl">
+        <!-- LEVEL -->
+        <div class="flex flex-col items-center">
+            <span class="text-xs uppercase tracking-widest text-slate-400 font-semibold">Level</span>
+            <span id="level-display" class="stat-number text-2xl sm:text-3xl font-extrabold text-sky-400">00</span>
+        </div>
+
+        <div class="h-8 w-px bg-slate-700/60"></div>
+
+        <!-- SCORE -->
+        <div class="flex flex-col items-center">
+            <span class="text-xs uppercase tracking-widest text-slate-400 font-semibold">Score</span>
+            <span id="score-display" class="stat-number text-2xl sm:text-3xl font-extrabold text-emerald-400">00</span>
+        </div>
+
+        <div class="h-8 w-px bg-slate-700/60"></div>
+
+        <!-- BEST -->
+        <div class="flex flex-col items-center">
+            <span class="text-xs uppercase tracking-widest text-slate-400 font-semibold">Best</span>
+            <span id="high-score-display" class="stat-number text-2xl sm:text-3xl font-extrabold text-amber-400">00</span>
+        </div>
+    </div>
+</header>
+
+
+<!-- =========================================================
+     MAIN GAME
+========================================================= -->
+<main class="relative my-5 flex flex-col items-center justify-center w-full max-w-lg">
+
+    <!-- STATUS -->
+    <div id="status-badge" class="mb-4 px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold tracking-wide transition-all duration-300 bg-slate-800/80 text-sky-300 border border-sky-500/30 shadow-lg text-center">
+        Press START to play or tap a button to practice!
+    </div>
+
+    <!-- =====================================================
+         WHEEL
+    ====================================================== -->
+    <div class="wheel-wrapper relative w-full aspect-square max-w-[400px] flex items-center justify-center">
+        <svg id="game-wheel" class="w-full h-full filter drop-shadow-2xl" viewBox="0 0 400 400">
+            <!-- OUTER FRAME -->
+            <circle cx="200" cy="200" r="192" fill="#0b1520" stroke="#425466" stroke-width="6"/>
+
+            <g id="sectors-group">
+
+                <!-- BUS (Sector 0) -->
+                <g id="sector-0" class="sector sector-bus" role="button" aria-label="Bus">
+                    <path
+                        d="M172.5,152.4 L107.5,39.8 A185,185 0 0,1 292.5,39.8 L227.5,152.4 A55,55 0 0,0 172.5,152.4 Z"
+                        fill="#f5c928" stroke="#0b1520" stroke-width="4"
+                    />
+                    <g transform="translate(200 83)">
+                        <text class="emoji-icon" text-anchor="middle" dominant-baseline="middle" font-size="42">🚌</text>
+                        <text y="36" text-anchor="middle" fill="#302900" font-size="13" font-weight="800" letter-spacing="0.5">BUS</text>
+                    </g>
+                </g>
+
+                <!-- HELICOPTER (Sector 1) -->
+                <g id="sector-1" class="sector sector-helicopter" role="button" aria-label="Helicopter">
+                    <path
+                        d="M227.5,152.4 L292.5,39.8 A185,185 0 0,1 385,200 L255,200 A55,55 0 0,0 227.5,152.4 Z"
+                        fill="#2dd4bf" stroke="#0b1520" stroke-width="4"
+                    />
+                    <g transform="translate(305 139)">
+                        <text class="emoji-icon" text-anchor="middle" dominant-baseline="middle" font-size="42">🚁</text>
+                        <text y="36" text-anchor="middle" fill="#042f2e" font-size="9" font-weight="800">HELICOPTER</text>
+                    </g>
+                </g>
+
+                <!-- TRAIN (Sector 2) -->
+                <g id="sector-2" class="sector sector-train" role="button" aria-label="Train">
+                    <path
+                        d="M255,200 L385,200 A185,185 0 0,1 292.5,360.2 L227.5,247.6 A55,55 0 0,0 255,200 Z"
+                        fill="#a855f7" stroke="#0b1520" stroke-width="4"
+                    />
+                    <g transform="translate(305 263)">
+                        <text class="emoji-icon" text-anchor="middle" dominant-baseline="middle" font-size="42">🚂</text>
+                        <text y="36" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="800">TRAIN</text>
+                    </g>
+                </g>
+
+                <!-- CAR (Sector 3) -->
+                <g id="sector-3" class="sector sector-car" role="button" aria-label="Car">
+                    <path
+                        d="M227.5,247.6 L292.5,360.2 A185,185 0 0,1 107.5,360.2 L172.5,247.6 A55,55 0 0,0 227.5,247.6 Z"
+                        fill="#ef4444" stroke="#0b1520" stroke-width="4"
+                    />
+                    <g transform="translate(200 318)">
+                        <text class="emoji-icon" text-anchor="middle" dominant-baseline="middle" font-size="42">🚗</text>
+                        <text y="36" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="800">CAR</text>
+                    </g>
+                </g>
+
+                <!-- AIRPLANE (Sector 4) -->
+                <g id="sector-4" class="sector sector-airplane" role="button" aria-label="Airplane">
+                    <path
+                        d="M172.5,247.6 L107.5,360.2 A185,185 0 0,1 15,200 L145,200 A55,55 0 0,0 172.5,247.6 Z"
+                        fill="#3b82f6" stroke="#0b1520" stroke-width="4"
+                    />
+                    <g transform="translate(96 263)">
+                        <text class="emoji-icon" text-anchor="middle" dominant-baseline="middle" font-size="42">✈️</text>
+                        <text y="36" text-anchor="middle" fill="#ffffff" font-size="11" font-weight="800">AIRPLANE</text>
+                    </g>
+                </g>
+
+                <!-- MOTORCYCLE (Sector 5) -->
+                <g id="sector-5" class="sector sector-motorcycle" role="button" aria-label="Motorcycle">
+                    <path
+                        d="M145,200 L15,200 A185,185 0 0,1 107.5,39.8 L172.5,152.4 A55,55 0 0,0 145,200 Z"
+                        fill="#22c55e" stroke="#0b1520" stroke-width="4"
+                    />
+                    <g transform="translate(96 139)">
+                        <text class="emoji-icon" text-anchor="middle" dominant-baseline="middle" font-size="42">🏍️</text>
+                        <text y="36" text-anchor="middle" fill="#052e16" font-size="9" font-weight="800">MOTORCYCLE</text>
+                    </g>
+                </g>
+
+            </g>
+
+            <!-- =================================================
+                 CENTER HUB
+            ================================================== -->
+            <circle cx="200" cy="200" r="55" fill="#0b1520" stroke="#425466" stroke-width="4"/>
+            <circle id="center-ring" class="center-ring" cx="200" cy="200" r="45" fill="#1c2d3d"/>
+            
+            <text x="200" y="198" text-anchor="middle" font-size="25">🧠</text>
+            <text x="200" y="220" text-anchor="middle" fill="#a8bacb" font-size="9" font-weight="700" letter-spacing="1">LISTEN</text>
+
+        </svg>
+    </div>
+</main>
+
+
+<!-- =========================================================
+     CONTROLS
+========================================================= -->
+<footer class="w-full max-w-md flex flex-col sm:flex-row items-center justify-center gap-4 mb-3">
+
+    <!-- START -->
+    <button id="start-btn" class="pulse-btn w-full sm:w-auto flex-1 py-3.5 px-8 rounded-full bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-extrabold text-lg tracking-wider shadow-xl transition-all transform active:scale-95 border border-sky-300/30 flex items-center justify-center gap-2">
+        <span class="text-xl">▶</span>
+        <span id="start-btn-text">START GAME</span>
+    </button>
+
+    <!-- MUTE -->
+    <button id="mute-btn" class="w-full sm:w-auto py-3.5 px-6 rounded-full glass-panel hover:bg-slate-700/60 text-slate-200 font-bold text-sm tracking-wide shadow-lg transition-all border border-slate-600/50 flex items-center justify-center gap-2">
+        <span id="mute-icon">🔊</span>
+        <span id="mute-btn-text">SOUND ON</span>
+    </button>
+
+</footer>
+
+<!-- =========================================================
+     GAME OVER MODAL
+========================================================= -->
+<div id="game-over-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 opacity-0 pointer-events-none modal-fade">
+    <div id="modal-box" class="modal-box glass-panel max-w-sm w-full rounded-3xl p-6 sm:p-8 flex flex-col items-center text-center border border-slate-700 shadow-2xl scale-95">
+        
+        <div class="w-16 h-16 rounded-full bg-red-500/20 text-red-400 border border-red-500/40 flex items-center justify-center mb-4 text-3xl">
+            ❌
+        </div>
+        
+        <h2 class="text-2xl font-bold text-white mb-1">Oops! Try Again</h2>
+        <p class="text-slate-400 text-sm mb-6">You missed the sequence. Keep practicing your English vocabulary!</p>
+        
+        <div class="w-full bg-slate-800/80 rounded-2xl p-4 mb-6 flex justify-around border border-slate-700/50">
+            <div>
+                <div class="text-xs uppercase text-slate-400 font-semibold">Level Reached</div>
+                <div id="modal-level" class="text-2xl font-black text-sky-400">00</div>
+            </div>
+            <div class="w-px bg-slate-700"></div>
+            <div>
+                <div class="text-xs uppercase text-slate-400 font-semibold">Total Score</div>
+                <div id="modal-score" class="text-2xl font-black text-emerald-400">00</div>
+            </div>
+        </div>
+
+        <button id="modal-restart-btn" class="w-full py-3.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-extrabold tracking-wider shadow-lg transition-all transform active:scale-95">
+            PLAY AGAIN
+        </button>
+    </div>
+</div>
+
+
+<!-- =========================================================
+     JAVASCRIPT
+========================================================= -->
+<script>
+/* =========================================================
+   VOCABULARY (UPDATED TO TRANSPORT)
+========================================================= */
+const VOCABULARY = [
+    { id: 0, word: "Bus", freq: 261.63 },
+    { id: 1, word: "Helicopter", freq: 293.66 },
+    { id: 2, word: "Train", freq: 329.63 },
+    { id: 3, word: "Car", freq: 349.23 },
+    { id: 4, word: "Airplane", freq: 392.00 },
+    { id: 5, word: "Motorcycle", freq: 440.00 }
+];
+
+/* =========================================================
+   GAME STATE
+========================================================= */
+const gameState = {
+    sequence: [],
+    playerStep: 0,
+    level: 0,
+    score: 0,
+    highScore: Number(localStorage.getItem("memorizeTransportVocabBest")) || 0,
+    isPlayingSequence: false,
+    gameActive: false,
+    isMuted: false,
+    inputLocked: false
+};
+
+/* =========================================================
+   DOM REFERENCES
+========================================================= */
+const levelDisplay = document.getElementById("level-display");
+const scoreDisplay = document.getElementById("score-display");
+const highScoreDisplay = document.getElementById("high-score-display");
+const statusBadge = document.getElementById("status-badge");
+const startBtn = document.getElementById("start-btn");
+const startBtnText = document.getElementById("start-btn-text");
+const muteBtn = document.getElementById("mute-btn");
+const muteBtnText = document.getElementById("mute-btn-text");
+const muteIcon = document.getElementById("mute-icon");
+const gameWheel = document.getElementById("game-wheel");
+const sectorsGroup = document.getElementById("sectors-group");
+const centerRing = document.getElementById("center-ring");
+const modal = document.getElementById("game-over-modal");
+const modalBox = document.getElementById("modal-box");
+const modalLevel = document.getElementById("modal-level");
+const modalScore = document.getElementById("modal-score");
+const modalRestart = document.getElementById("modal-restart-btn");
+
+
+/* =========================================================
+   AUDIO CONTEXT
+========================================================= */
+let audioContext = null;
+
+function getAudioContext() {
+    if (!audioContext) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return null;
+        audioContext = new AudioContext();
+    }
+    if (audioContext.state === "suspended") {
+        audioContext.resume();
+    }
+    return audioContext;
+}
+
+/* =========================================================
+   SOUND EFFECTS
+========================================================= */
+function playTone(frequency, duration = 0.16) {
+    if (gameState.isMuted) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
+
+        gain.gain.setValueAtTime(0.001, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.06, ctx.currentTime + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+
+        oscillator.start();
+        oscillator.stop(ctx.currentTime + duration);
+    } catch (error) {
+        console.warn("Could not play tone.", error);
+    }
+}
+
+function playErrorSound() {
+    if (gameState.isMuted) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    try {
+        const oscillator = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        oscillator.type = "sawtooth";
+        oscillator.frequency.setValueAtTime(150, ctx.currentTime);
+        oscillator.frequency.exponentialRampToValueAtTime(60, ctx.currentTime + 0.45);
+
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+
+        oscillator.connect(gain);
+        gain.connect(ctx.destination);
+
+        oscillator.start();
+        oscillator.stop(ctx.currentTime + 0.45);
+    } catch (error) {}
+}
+
+/* =========================================================
+   SPEECH SYNTHESIS
+========================================================= */
+let preferredVoice = null;
+
+function loadVoices() {
+    if (!("speechSynthesis" in window)) return;
+    const voices = window.speechSynthesis.getVoices();
+    preferredVoice = voices.find(voice => voice.lang === "en-US" && (voice.name.toLowerCase().includes("google") || voice.name.toLowerCase().includes("natural") || voice.name.toLowerCase().includes("samantha")))
+        || voices.find(voice => voice.lang === "en-US")
+        || voices.find(voice => voice.lang.startsWith("en"))
+        || voices[0];
+}
+
+if ("speechSynthesis" in window) {
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+}
+
+function speakWord(text) {
+    return new Promise(resolve => {
+        if (gameState.isMuted || !("speechSynthesis" in window)) {
+            resolve();
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        utterance.rate = 0.88;
+        utterance.pitch = 1.05;
+        utterance.volume = 1;
+
+        if (preferredVoice) utterance.voice = preferredVoice;
+
+        let finished = false;
+        function finish() {
+            if (finished) return;
+            finished = true;
+            resolve();
+        }
+
+        utterance.onend = finish;
+        utterance.onerror = finish;
+
+        const timeout = setTimeout(finish, 1800);
+        utterance.onend = () => { clearTimeout(timeout); finish(); };
+        utterance.onerror = () => { clearTimeout(timeout); finish(); };
+
+        window.speechSynthesis.speak(utterance);
+    });
+}
+
+
+/* =========================================================
+   HELPERS & UI
+========================================================= */
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function updateUI() {
+    levelDisplay.textContent = String(gameState.level).padStart(2, "0");
+    scoreDisplay.textContent = String(gameState.score).padStart(2, "0");
+    highScoreDisplay.textContent = String(gameState.highScore).padStart(2, "0");
+}
+
+function setStatus(message, type = "info") {
+    statusBadge.className = `mb-4 px-5 py-1.5 rounded-full text-xs sm:text-sm font-bold tracking-wide transition-all duration-300 shadow-lg border text-center`;
+    statusBadge.textContent = message;
+
+    if (type === "listen") {
+        statusBadge.classList.add("bg-amber-900/60", "text-amber-300", "border-amber-500/50");
+    } else if (type === "your-turn") {
+        statusBadge.classList.add("bg-emerald-900/60", "text-emerald-300", "border-emerald-500/50");
+    } else if (type === "error") {
+        statusBadge.classList.add("bg-red-900/60", "text-red-300", "border-red-500/50");
+    } else {
+        statusBadge.classList.add("bg-slate-800/80", "text-sky-300", "border-sky-500/30");
+    }
+}
+
+function highlightSector(index) {
+    const sector = document.getElementById(`sector-${index}`);
+    if (!sector) return;
+    sector.classList.add("active");
+    centerRing.classList.remove("pulse");
+    void centerRing.offsetWidth;
+    centerRing.classList.add("pulse");
+}
+
+function unhighlightSector(index) {
+    const sector = document.getElementById(`sector-${index}`);
+    if (sector) sector.classList.remove("active");
+}
+
+/* =========================================================
+   PLAY ONE SEQUENCE ITEM
+========================================================= */
+async function playSequenceItem(index) {
+    const vocab = VOCABULARY[index];
+    highlightSector(index);
+    playTone(vocab.freq, 0.16);
+    await speakWord(vocab.word);
+    unhighlightSector(index);
+    await delay(80); // Pequena pausa entre as palavras
+}
+
+/* =========================================================
+   PLAY COMPLETE SEQUENCE
+========================================================= */
+async function playSequence() {
+    gameState.isPlayingSequence = true;
+    gameState.inputLocked = true;
+    sectorsGroup.classList.add("board-locked");
+    setStatus(`Level ${gameState.level}: Listen carefully!`, "listen");
+
+    await delay(500); // Tempo de preparo
+
+    for (let i = 0; i < gameState.sequence.length; i++) {
+        await playSequenceItem(gameState.sequence[i]);
+    }
+
+    gameState.playerStep = 0;
+    gameState.isPlayingSequence = false;
+    gameState.inputLocked = false;
+    sectorsGroup.classList.remove("board-locked");
+    setStatus("Your turn! Repeat the pattern.", "your-turn");
+}
+
+/* =========================================================
+   NEXT ROUND
+========================================================= */
+async function nextRound() {
+    if (!gameState.gameActive) return;
+    
+    gameState.isPlayingSequence = true;
+    gameState.inputLocked = true;
+    sectorsGroup.classList.add("board-locked");
+
+    // Sorteia um novo transporte e adiciona à sequência
+    const randomIndex = Math.floor(Math.random() * VOCABULARY.length);
+    gameState.sequence.push(randomIndex);
+    
+    await playSequence();
+}
+
+
+/* =========================================================
+   START GAME
+========================================================= */
+async function startGame() {
+    getAudioContext();
+    if ("speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        
+        /* OPTIMIZATION: Wake up the speech engine silently on older devices */
+        const wakeUp = new SpeechSynthesisUtterance("");
+        wakeUp.volume = 0;
+        window.speechSynthesis.speak(wakeUp);
+    }
+
+    gameState.sequence = [];
+    gameState.playerStep = 0;
+    gameState.level = 1;
+    gameState.score = 0;
+    gameState.gameActive = true;
+    gameState.isPlayingSequence = false;
+    gameState.inputLocked = false;
+
+    startBtnText.textContent = "RESTART";
+    startBtn.classList.remove("pulse-btn");
+
+    hideGameOver();
+    updateUI();
+    setStatus("Get ready...", "info");
+
+    await delay(350);
+    nextRound();
+}
+
+
+/* =========================================================
+   PLAYER INTERACTION
+========================================================= */
+async function handleSectorClick(index) {
+    if (gameState.isPlayingSequence || gameState.inputLocked) return;
+
+    const vocab = VOCABULARY[index];
+    highlightSector(index);
+    playTone(vocab.freq, 0.16);
+    await speakWord(vocab.word);
+    unhighlightSector(index);
+
+    if (!gameState.gameActive) return;
+
+    const expected = gameState.sequence[gameState.playerStep];
+
+    if (index === expected) {
+        gameState.playerStep++;
+        gameState.score += 10;
+
+        if (gameState.score > gameState.highScore) {
+            gameState.highScore = gameState.score;
+            localStorage.setItem("memorizeTransportVocabBest", String(gameState.highScore));
+        }
+
+        updateUI();
+
+        if (gameState.playerStep === gameState.sequence.length) {
+            gameState.inputLocked = true;
+            gameState.isPlayingSequence = true;
+            sectorsGroup.classList.add("board-locked");
+            setStatus("⭐ Excellent! Next level!", "your-turn");
+            gameWheel.classList.add("success-pulse");
+
+            if (gameState.level % 3 === 0 && typeof confetti === "function") {
+                confetti({
+                    particleCount: 70, spread: 70, startVelocity: 30, origin: { y: 0.65 }
+                });
+            }
+
+            await delay(500);
+            gameWheel.classList.remove("success-pulse");
+            gameState.level++;
+            updateUI();
+            await nextRound();
+        }
+    } else {
+        handleGameOver();
+    }
+}
+
+function handleGameOver() {
+    gameState.gameActive = false;
+    gameState.isPlayingSequence = false;
+    gameState.inputLocked = true;
+    sectorsGroup.classList.remove("board-locked");
+
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    playErrorSound();
+    setStatus("❌ Wrong order! Game over.", "error");
+    gameWheel.classList.add("error-shake");
+
+    setTimeout(() => {
+        gameWheel.classList.remove("error-shake");
+        showGameOver();
+    }, 650);
+}
+
+function showGameOver() {
+    modalLevel.textContent = String(gameState.level).padStart(2, "0");
+    modalScore.textContent = String(gameState.score).padStart(2, "0");
+    modal.classList.remove("opacity-0", "pointer-events-none");
+    modalBox.classList.remove("scale-95");
+    modalBox.classList.add("scale-100");
+}
+
+function hideGameOver() {
+    modal.classList.add("opacity-0", "pointer-events-none");
+    modalBox.classList.remove("scale-100");
+    modalBox.classList.add("scale-95");
+}
+
+
+/* =========================================================
+   EVENT LISTENERS
+========================================================= */
+muteBtn.addEventListener("click", () => {
+    gameState.isMuted = !gameState.isMuted;
+    if (gameState.isMuted) {
+        if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+        muteIcon.textContent = "🔇";
+        muteBtnText.textContent = "SOUND OFF";
+        muteBtn.classList.add("text-red-400", "border-red-500/40");
+    } else {
+        muteIcon.textContent = "🔊";
+        muteBtnText.textContent = "SOUND ON";
+        muteBtn.classList.remove("text-red-400", "border-red-500/40");
+    }
+});
+
+VOCABULARY.forEach(vocab => {
+    const sector = document.getElementById(`sector-${vocab.id}`);
+    if (sector) {
+        sector.addEventListener("click", event => {
+            event.preventDefault();
+            handleSectorClick(vocab.id);
+        });
+    }
+});
+
+startBtn.addEventListener("click", startGame);
+modalRestart.addEventListener("click", startGame);
+
+document.addEventListener("keydown", event => {
+    /*
+     * 1 = Bus
+     * 2 = Helicopter
+     * 3 = Train
+     * 4 = Car
+     * 5 = Airplane
+     * 6 = Motorcycle
+     */
+    if (event.key >= "1" && event.key <= "6") {
+        const index = Number(event.key) - 1;
+        handleSectorClick(index);
+    }
+    if (event.code === "Space") {
+        event.preventDefault();
+        startGame();
+    }
+});
+
+updateUI();
+setStatus("Press START to play or tap a button to practice!", "info");
+
+</script>
+</body>
+</html>
